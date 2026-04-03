@@ -670,7 +670,7 @@ Next make a table with sequences and taxonomy strings:
       --m-input-file filtered_taxonomy_minfreq150_minabund1.qza \
       --o-visualization sequence_taxonomy_minfreq150_minabund1.qzv
 
-### I THINK THIS IS RIGHT BUT CHECK WITH BIGELOW BEFORE RUNNING
+**I THINK THIS IS RIGHT BUT CHECK WITH BIGELOW BEFORE FINALISING**
 
 Make edits after reading the taxonomy artifact into R.
 
@@ -732,164 +732,11 @@ samples on the plate as they all look too similar.
 This will mean starting again with plate 64 after removing those
 samples.
 
-### Create RRA table
+## 12. Create RRA table
 
-``` r
-library(qiime2R)
-library(dplyr)
-library(tibble)
-
-# Convert your .txt to .tsv
-metadata <- read.table("MiFish/metadata.txt", sep = "\t", header = TRUE, comment.char = "#")
-write.table(metadata, "MiFish/metadata.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
-
-
-# Version that uses the most specific taxonomy level available for each taxon
-get_relative_abundance_table <- function(table_qza, metadata_tsv, taxonomy_qza, 
-                                       output_file = "relative_abundance_table.csv") {
-  
-  feature_table <- read_qza(table_qza)$data
-  taxonomy <- read_qza(taxonomy_qza)$data
-  
-  # Convert to relative abundance
-  relative_abundance <- sweep(feature_table, 2, colSums(feature_table), FUN = "/")
-  
-  # Parse taxonomy
-  tax_split <- taxonomy %>%
-    separate(Taxon, 
-            c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
-            sep = ";", fill = "right", remove = FALSE) %>%
-    mutate(across(Kingdom:Species, ~gsub("^[a-z]__", "", .x))) %>%
-    mutate(across(Kingdom:Species, ~trimws(.x))) %>%
-    # Replace empty strings and "unassigned" with NA
-    mutate(across(Kingdom:Species, ~ifelse(.x == "" | .x == "unassigned", NA, .x)))
-  
-  # Combine relative abundance with taxonomy
-  rra_with_tax <- relative_abundance %>%
-    as.data.frame() %>%
-    rownames_to_column("FeatureID") %>%
-    left_join(tax_split, by = c("FeatureID" = "Feature.ID"))
-  
-  # Get sample columns (numeric columns)
-  sample_cols <- rra_with_tax %>%
-    select(where(is.numeric), -Consensus, -Confidence) %>%
-    colnames()
-  
-  # Create the most specific taxonomy identifier for each row
-  rra_with_tax <- rra_with_tax %>%
-    rowwise() %>%
-    mutate(
-      # Find the most specific (last non-NA) taxonomic level
-      MostSpecificTaxon = case_when(
-        !is.na(Species) ~ paste(Kingdom, Phylum, Class, Order, Family, Genus, Species, sep = "; "),
-        !is.na(Genus) ~ paste(Kingdom, Phylum, Class, Order, Family, Genus, sep = "; "),
-        !is.na(Family) ~ paste(Kingdom, Phylum, Class, Order, Family, sep = "; "),
-        !is.na(Order) ~ paste(Kingdom, Phylum, Class, Order, sep = "; "),
-        !is.na(Class) ~ paste(Kingdom, Phylum, Class, sep = "; "),
-        !is.na(Phylum) ~ paste(Kingdom, Phylum, sep = "; "),
-        !is.na(Kingdom) ~ Kingdom,
-        TRUE ~ "Unclassified"
-      ),
-      # Also create a label showing the taxonomic level
-      TaxonomicLevel = case_when(
-        !is.na(Species) ~ "Species",
-        !is.na(Genus) ~ "Genus", 
-        !is.na(Family) ~ "Family",
-        !is.na(Order) ~ "Order",
-        !is.na(Class) ~ "Class",
-        !is.na(Phylum) ~ "Phylum",
-        !is.na(Kingdom) ~ "Kingdom",
-        TRUE ~ "Unclassified"
-      )
-    ) %>%
-    ungroup()
-  
-  # Now aggregate by the most specific taxonomy
-  aggregated_table <- rra_with_tax %>%
-    group_by(MostSpecificTaxon, TaxonomicLevel, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
-    summarise(across(all_of(sample_cols), sum, na.rm = TRUE), .groups = "drop") %>%
-    arrange(TaxonomicLevel, MostSpecificTaxon)
-  
-  # Write to CSV
-  write.csv(aggregated_table, output_file, row.names = FALSE)
-  
-  # Print summary
-  cat("Summary of aggregated taxonomy:\n")
-  print(table(aggregated_table$TaxonomicLevel))
-  
-  # Return the table
-  return(aggregated_table)
-}
-
-# Usage:
-aggregated_table <- get_relative_abundance_table("MiFish/filtered_table_minfreq150_minabund1.qza",
-                                                 "MiFish/metadata.tsv", 
-                                                 "MiFish/superblast_taxonomy_edited.qza",
-                                                 output_file = "MiFish/relative_abundance_table.csv")
-```
-
-    ## Warning: There was 1 warning in `summarise()`.
-    ## ℹ In argument: `across(all_of(sample_cols), sum, na.rm = TRUE)`.
-    ## ℹ In group 1: `MostSpecificTaxon = "Metazoa; Chordata; Actinopteri; Gadiformes;
-    ##   Gadidae; Gadus; morhua"`, `TaxonomicLevel = "Species"`, `Kingdom =
-    ##   "Metazoa"`, `Phylum = "Chordata"`, `Class = "Actinopteri"`, `Order =
-    ##   "Gadiformes"`, `Family = "Gadidae"`, `Genus = "Gadus"`, `Species = "morhua"`.
-    ## Caused by warning:
-    ## ! The `...` argument of `across()` is deprecated as of dplyr 1.1.0.
-    ## Supply arguments directly to `.fns` through an anonymous function instead.
-    ## 
-    ##   # Previously
-    ##   across(a:b, mean, na.rm = TRUE)
-    ## 
-    ##   # Now
-    ##   across(a:b, \(x) mean(x, na.rm = TRUE))
-
-    ## Summary of aggregated taxonomy:
-    ## 
-    ##  Family   Genus Species 
-    ##       1       5       7
-
-``` r
-# Check the results
-head(aggregated_table[, c("MostSpecificTaxon", "TaxonomicLevel")])
-```
-
-    ## # A tibble: 6 × 2
-    ##   MostSpecificTaxon                                               TaxonomicLevel
-    ##   <chr>                                                           <chr>         
-    ## 1 Metazoa; Chordata; Actinopteri; Perciformes; Cryptacanthodidae  Family        
-    ## 2 Metazoa; Chordata; Actinopteri; Perciformes; Anarhichadidae; A… Genus         
-    ## 3 Metazoa; Chordata; Actinopteri; Perciformes; Cottidae; Myoxoce… Genus         
-    ## 4 Metazoa; Chordata; Actinopteri; Perciformes; Liparidae; Liparis Genus         
-    ## 5 Metazoa; Chordata; Actinopteri; Perciformes; Sebastidae; Sebas… Genus         
-    ## 6 Metazoa; Chordata; Actinopteri; Uranoscopiformes; Ammodytidae;… Genus
-
-This is pretty long and the resulting table is not that easy to work
-with. It also loses the metadata associated with each sample, so I do
-not like this method.
-
-### What about a simpler way using the csv I can get from the barplot?
-
-``` r
-# Simple one-liner version
-data <- read.csv("MiFish/level7_noBirdsMammalsUnassigned_minfreq150_minabund1_taxedit.csv")
-
-# Find numeric columns (these are your count data)
-numeric_cols <- sapply(data, is.numeric)
-
-# Convert counts to relative abundance
-data[, numeric_cols] <- sweep(data[, numeric_cols], 2, colSums(data[, numeric_cols]), FUN = "/")
-
-# Save result
-write.csv(data, "rra_table.csv", row.names = FALSE)
-```
-
-This is confusing the plate and year columns with the count data
-
-### What about doing it from code I made for gannets?
-
-I have modified this quite a lot to remove the 1% abundance filtering
-and to keep the sample metadata in the output.
+I have modified this from the code I had for the UK gannet project. I
+had to remove the 1% abundance filtering and changed it to keep the
+sample metadata in the output.
 
 ``` r
 library(qiime2R)
@@ -937,7 +784,7 @@ species_level_data <- complete_data %>%
     ## 'Age', 'Colony', 'Plate'. You can override using the `.groups` argument.
 
 ``` r
-# Calculate relative abundance
+# Calculate relative abundances
 modified_species_data <- species_level_data %>%
   group_by(SampleID) %>%
   # Calculate percentages
@@ -946,7 +793,7 @@ modified_species_data <- species_level_data %>%
   ungroup()
 
 
-# Pivot to wide format with samples as rows, taxa as columns this way instead
+# Pivot to wide format with samples as rows, taxa as columns, but keep other metadata
 pivot_samples_wide <- function(data) {
   
   # Pivot wider: SampleID becomes rows, TaxonName becomes columns
@@ -962,6 +809,7 @@ pivot_samples_wide <- function(data) {
 # Apply the function
 wide_relabund <- pivot_samples_wide(modified_species_data)
 
+# write-out
 if(knitr::opts_chunk$get("save_output")) {
   write.csv(wide_relabund,
             "MiFish/relative_abundance_table.csv",
@@ -969,10 +817,11 @@ if(knitr::opts_chunk$get("save_output")) {
 }
 ```
 
-This works and dovetails nicely into the next section for plotting. But
-I still lose the sample metadata when I pivot the data to wide format.
+This works and now keeps the sample metadata in the final table.
 
-## 10. Quick plot
+## 13. Quick plot
+
+Top “n” taxa not working right now.
 
 ``` r
 # To keep top N taxa and group others
@@ -998,13 +847,17 @@ ggplot(modified_species_data, aes(x = SampleID, y = RelativeAbundance, fill = Ta
     ## Warning in RColorBrewer::brewer.pal(n, pal): n too large, allowed maximum for palette Set3 is 12
     ## Returning the palette you asked for with that many colors
 
-![](MiFish_commands_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](MiFish_commands_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
 #ggsave("MiFish_2024/relative_abundance_per_sample.pdf", width = 12, height = 8)
 ```
 
-## 11. RRA summary
+Modify to plot the mean RRA for each year.
+
+## 14. RRA summary
+
+Need to figure out how to display by year properly.
 
 ``` r
 modified_species_data %>% group_by(TaxonName, Year) %>% 
@@ -1016,6 +869,19 @@ modified_species_data %>% group_by(TaxonName, Year) %>%
 
     ## `summarise()` has grouped output by 'TaxonName'. You can override using the
     ## `.groups` argument.
+
+    ## Warning: There was 1 warning in `mutate()`.
+    ## ℹ In argument: `across(where(is.numeric), round, 2)`.
+    ## ℹ In group 1: `TaxonName = "Ammodytes (genus level)"`.
+    ## Caused by warning:
+    ## ! The `...` argument of `across()` is deprecated as of dplyr 1.1.0.
+    ## Supply arguments directly to `.fns` through an anonymous function instead.
+    ## 
+    ##   # Previously
+    ##   across(a:b, mean, na.rm = TRUE)
+    ## 
+    ##   # Now
+    ##   across(a:b, \(x) mean(x, na.rm = TRUE))
 
 | TaxonName                        | Year | RRA_percent |
 |:---------------------------------|:-----|------------:|
