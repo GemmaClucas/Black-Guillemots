@@ -29,11 +29,15 @@ library(qiime2R)
 ```
 
 All analyses performed in the folder
-`Fecal_metabarcoding/Black-Guillemots`.
+`Fecal_metabarcoding/Black-Guillemots`. We have four plates on which the
+samples have been sequenced: 24, 64, 81, and 146.
 
     conda activate qiime2-amplicon-2024.10 
     mkdir MiFish
     cd MiFish
+
+Will have to redo everything once we have redone plate 146 with the
+MiFish primers.
 
 ## 2. Import the data into QIIME2
 
@@ -44,7 +48,7 @@ All analyses performed in the folder
         --input-format CasavaOneEightSingleLanePerSampleDirFmt\
         --output-path demux_Plate$K.qza
     done
-      
+
 
     for K in 24 64 81 146; do
       qiime demux summarize \
@@ -87,7 +91,7 @@ To see how much data passed the filter for each sample:
 It looks like 77% is being kept for the first samples, but the samples
 on plate 146 are at 100%, suggesting a problem with them.
 
-**Did Alex use MiniFish primers for plate 140??**
+**Trimming for MiniFish primers on Plate 146**
 
 Try trimming for minifish instead
 
@@ -141,7 +145,7 @@ To see how much data passed the filter for each sample:
 88% consistently for first set of samples, but then 100% for plate 146
 again.
 
-\*\* Redo 146 for MiniFish primers\*\*
+**Redo 146 for MiniFish primers**
 
     for K in 146; do
       qiime cutadapt trim-paired \
@@ -384,13 +388,6 @@ Usage:
       --m-input-file superblast_taxonomy.qza \
       --o-visualization superblast_taxonomy
 
-Output sequence taxonomy file with rep-seqs and their assigned taxa.
-
-    qiime metadata tabulate \
-      --m-input-file merged_rep-seqs.qza \
-      --m-input-file superblast_taxonomy.qza \
-      --o-visualization sequence_taxonomy.qzv
-
 Make a barplot to eye-ball what’s in our samples:
 
     qiime taxa barplot \
@@ -400,11 +397,12 @@ Make a barplot to eye-ball what’s in our samples:
       --o-visualization barplot_before_filtering.qzv
 
 Plate 146 looks very different to the other samples as fish are
-consistently being assigned to different taxa.
+consistently being assigned to different taxa because of the use of the
+wrong primers.
 
 MiniFish primers have missed Atlantic herring in the mock community, but
 there is no herring in the samples from any of the other years, so this
-is not a problem. Are they missing other things though?
+is hopefully not a problem. Are they missing other things though?
 
 The MiniFish primers have also not amplified any guillemot DNA compared
 to the MiFish primers, but the amount amplified by MiFish primers is
@@ -463,10 +461,10 @@ results <- analyze_read_depths(
     ## 
     ## |Type     |Plate | Mean Reads| Median Reads| SD Reads|  n| % of Sample Reads|
     ## |:--------|:-----|----------:|------------:|--------:|--:|-----------------:|
-    ## |EXTBLANK |64    |       60.5|          121|       NA|  2|              0.05|
-    ## |SAMPLE   |64    |   120715.3|       107563| 96529.39| 35|            100.00|
-    ## |MOCK     |64    |   244712.0|       244712|       NA|  1|            202.72|
-    ## |PCRBLANK |64    |        0.0|            0|     0.00|  1|              0.00|
+    ## |EXTBLANK |64    |       60.5|          121|       NA|  2|              0.06|
+    ## |SAMPLE   |64    |   101925.7|        83869|  86192.8| 23|            100.00|
+    ## |MOCK     |64    |   244731.0|       244731|       NA|  1|            240.11|
+    ## |PCRBLANK |64    |        0.0|            0|      0.0|  1|              0.00|
     ## 
     ## 
     ## ### Read Depth Summary - Plate 146
@@ -519,12 +517,12 @@ results <- analyze_read_depths(
     ## |:--------|----------:|------------:|---------:|---:|-----------------:|
     ## |EXTBLANK |      10.08|        121.0|        NA|  12|              0.01|
     ## |FLDBLANK |     206.75|        221.5|    467.92|   8|              0.13|
-    ## |SAMPLE   |  154216.54|     126326.0| 134972.38| 153|            100.00|
-    ## |MOCK     |  221214.00|     238397.5|  98039.18|   4|            143.44|
+    ## |SAMPLE   |  154002.74|     121336.0| 137303.14| 141|            100.00|
+    ## |MOCK     |  221218.75|     238407.0|  98040.70|   4|            143.65|
     ## |PCRBLANK |       0.00|          0.0|      0.00|   5|              0.00|
 
-Good news, the extraction-, field-, and PCR-banks all have barely any
-reads in them.
+The extraction-, field-, and PCR-banks all have barely any reads in
+them.
 
 ## 9. Calculate alpha rarefaction curves
 
@@ -552,12 +550,12 @@ Zoom in on that region.
       --i-table merged_table_noBirdsMammalsUnassigned_collapsed.qza \
       --m-metadata-file metadata.txt \
       --p-min-depth 50 \
-      --p-max-depth 600 \
-      --o-visualization alpha-rarefaction-50-600
+      --p-max-depth 500 \
+      --o-visualization alpha-rarefaction-50-500
 
-Species richness plateaus in the samples at 150 reads, so just drop
-samples with fewer than 150. This drops the final extraction blank, two
-of the field blanks, and two samples. Two field blanks remain with 312
+Species richness plateaus in the samples at 200 reads, so just drop
+samples with fewer than 200. This drops the final extraction blank, two
+of the field blanks, and three samples. Two field blanks remain with 312
 and 1,102 reads.
 
 ## 10. Filtering
@@ -566,16 +564,16 @@ and 1,102 reads.
 
     qiime feature-table filter-samples \
       --i-table merged_table_noBirdsMammalsUnassigned.qza \
-      --p-min-frequency 150 \
+      --p-min-frequency 200 \
       --m-metadata-file metadata.txt \
       --p-where "Type='SAMPLE'" \
-      --o-filtered-table merged_table_noBirdsMammalsUnassigned_minfreq150
+      --o-filtered-table merged_table_noBirdsMammalsUnassigned_minfreq200
       
     qiime taxa barplot \
-      --i-table merged_table_noBirdsMammalsUnassigned_minfreq150.qza  \
+      --i-table merged_table_noBirdsMammalsUnassigned_minfreq200.qza  \
       --m-metadata-file metadata.txt \
       --i-taxonomy superblast_taxonomy.qza \
-      --o-visualization barplot_noBirdsMammalsUnassigned_minfreq150
+      --o-visualization barplot_noBirdsMammalsUnassigned_minfreq200
 
 ### 1% Abundance filtering
 
@@ -589,7 +587,7 @@ never reach an RRA of more than 1% in any sample.
 ``` r
 # Set arguments
 args <- list(
-  feature_table = "MiFish/merged_table_noBirdsMammalsUnassigned_minfreq150.qza",
+  feature_table = "MiFish/merged_table_noBirdsMammalsUnassigned_minfreq200.qza",
   taxonomy = "MiFish/superblast_taxonomy.qza",
   metadata = "MiFish/metadata.txt",
   output_dir = "MiFish/",
@@ -614,17 +612,17 @@ process_data(
 
     ## 
     ## Summary Statistics:
-    ## Original number of features: 721 
-    ## Number of features after filtering: 634 
-    ## Number of features removed: 87 
+    ## Original number of features: 684 
+    ## Number of features after filtering: 601 
+    ## Number of features removed: 83 
     ## 
     ## Number of unique taxa before filtering: 56 
     ## Number of unique taxa after filtering: 17 
     ## Number of taxa removed: 39 
     ## 
-    ## Total reads before filtering: 23594893 
-    ## Total reads after filtering: 23541931 
-    ## Percentage of reads retained: 99.78 %
+    ## Total reads before filtering: 21714149 
+    ## Total reads after filtering: 21662535 
+    ## Percentage of reads retained: 99.76 %
 
 Import back into Qiime
 
@@ -633,22 +631,22 @@ Import back into Qiime
       --input-path filtered_feature_table.biom \
       --type 'FeatureTable[Frequency]' \
       --input-format BIOMV100Format \
-      --output-path filtered_table_minfreq150_minabund1.qza
+      --output-path filtered_table_minfreq200_minabund1.qza
 
     # Import taxonomy
     qiime tools import \
       --input-path filtered_taxonomy.tsv \
       --type 'FeatureData[Taxonomy]' \
       --input-format TSVTaxonomyFormat \
-      --output-path filtered_taxonomy_minfreq150_minabund1.qza
+      --output-path filtered_taxonomy_minfreq200_minabund1.qza
 
 Make a barplot with the filtered data
 
     qiime taxa barplot \
-      --i-table filtered_table_minfreq150_minabund1.qza \
-      --i-taxonomy filtered_taxonomy_minfreq150_minabund1.qza \
+      --i-table filtered_table_minfreq200_minabund1.qza \
+      --i-taxonomy filtered_taxonomy_minfreq200_minabund1.qza \
       --m-metadata-file metadata.txt \
-      --o-visualization barplot_minfreq150_minabund1.qzv
+      --o-visualization barplot_minfreq200_minabund1.qzv
 
 ## 11. Taxonomy edits
 
@@ -660,17 +658,28 @@ remaining samples after abundance filtering.
 
     qiime feature-table filter-seqs \
       --i-data merged_rep-seqs.qza \
-      --i-table filtered_table_minfreq150_minabund1.qza \
-      --o-filtered-data filtered_rep-seqs_minfreq150_minabund1.qza
+      --i-table filtered_table_minfreq200_minabund1.qza \
+      --o-filtered-data filtered_rep-seqs_minfreq200_minabund1.qza
 
 Next make a table with sequences and taxonomy strings:
 
     qiime metadata tabulate \
-      --m-input-file filtered_rep-seqs_minfreq150_minabund1.qza \
-      --m-input-file filtered_taxonomy_minfreq150_minabund1.qza \
-      --o-visualization sequence_taxonomy_minfreq150_minabund1.qzv
+      --m-input-file filtered_rep-seqs_minfreq200_minabund1.qza \
+      --m-input-file filtered_taxonomy_minfreq200_minabund1.qza \
+      --o-visualization sequence_taxonomy_minfreq200_minabund1.qzv
 
-**I THINK THIS IS RIGHT BUT CHECK WITH BIGELOW BEFORE FINALISING**
+A few notes on the taxonomy edits:  
+\* Pacific cod changed to Atlantic cod.  
+\* Atlantic wolffish changed to wolffish sp. although the Atlantic
+wolffish is by far the most common in the GoM out of the three
+possibilities according to Bigelow and Schroeder.  
+\* Three sculpins (Myoxocephalus sp.) are possible in the GoM - all
+common and genetically alike: longhorn, shorthorn, and grubby.  
+\* There is only one wrymouth found in the GoM according to Bigelow and
+Schroeder.  
+\* There are four Liparis spp in the GoM, but none were on genbank.  
+\* The redfish (Sebastes) species is most likely acadian redfish (S.
+fasciatus).
 
 Make edits after reading the taxonomy artifact into R.
 
@@ -679,14 +688,14 @@ tax <- read_qza("MiFish/superblast_taxonomy.qza")
 
 tax$data$Taxon <- tax$data$Taxon %>% 
   str_replace_all("g__Gadus;s__chalcogrammus", "g__Gadus;s__morhua") %>%       # Atlantic cod
-  str_replace_all("g__Anarhichas;s__lupus", "g__Anarhichas;s__") %>%       # Wolffish sp.
+  str_replace_all("g__Anarhichas;s__lupus", "g__Anarhichas;s__") %>%       # Wolffish sp. 
   str_replace_all("g__Microcottus;s__sellaris", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
   str_replace_all("g__Myoxocephalus;s__aenaeus", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
-  str_replace_all("g__Myoxocephalus;s__octodecemspinosus", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
-  str_replace_all("g__Cryptacanthodes;s__bergi", "g__;s__") %>%       # Cryptacanthodidae (wrymouths)
-  str_replace_all("g__Liparis;s__miostomus", "g__Liparis;s__") %>%       # 
+  str_replace_all("g__Myoxocephalus;s__octodecemspinosus", "g__Myoxocephalus;s__") %>%       # Sculpins sp. 
+  str_replace_all("g__Cryptacanthodes;s__bergi", "g__Cryptacanthodes;s__maculatus") %>%       # Wrymouth
+  str_replace_all("g__Liparis;s__miostomus", "g__Liparis;s__") %>%       # four possible Liparis species in GoM
   str_replace_all("g__Pholis;s__crassispina", "g__Pholis;s__gunnellus") %>%       # Rock gunnell
-  str_replace_all("g__Sebastes;s__mentella", "g__Sebastes;s__") %>%       # Redfish
+  str_replace_all("g__Sebastes;s__mentella", "g__Sebastes;s__") %>%       # Most likely acadian redfish (S. fasciatus) according to Bigelow & Schoeder
   str_replace_all("g__Opisthocentrus;s__ocellatus", "g__Ulvaria;s__subbifurcata") %>%       # Radiated shanny 
   str_replace_all("g__Ammodytes;s__dubius", "g__Ammodytes;s__")       # Sandlance
 ```
@@ -720,17 +729,10 @@ barplots with updated taxonomy.
       --o-visualization superblast_taxonomy_edited
       
     qiime taxa barplot \
-      --i-table filtered_table_minfreq150_minabund1.qza \
+      --i-table filtered_table_minfreq200_minabund1.qza \
       --i-taxonomy superblast_taxonomy_edited.qza \
       --m-metadata-file metadata.txt \
-      --o-visualization barplot_noBirdsMammalsUnassigned_minfreq150_minabund1_taxedit.qzv
-
-There are some questionable similarities between consecutive samples in
-the 2022 batch. I think I might need to remove the top half of the
-samples on the plate as they all look too similar.
-
-This will mean starting again with plate 64 after removing those
-samples.
+      --o-visualization barplot_noBirdsMammalsUnassigned_minfreq200_minabund1_taxedit.qzv
 
 ## 12. Create RRA table
 
@@ -742,7 +744,7 @@ sample metadata in the output.
 library(qiime2R)
 
 # Read in the QIIME 2 artifacts and metadata
-feature_table <- read_qza("MiFish/filtered_table_minfreq150_minabund1.qza")
+feature_table <- read_qza("MiFish/filtered_table_minfreq200_minabund1.qza")
 taxonomy_data <- read_qza("MiFish/superblast_taxonomy_edited.qza")
 metadata <- read_q2metadata("MiFish/metadata.txt")
 
@@ -821,7 +823,7 @@ This works and now keeps the sample metadata in the final table.
 
 ## 13. Quick plot
 
-Top “n” taxa not working right now.
+Plotting each sample:
 
 ``` r
 # To keep top N taxa and group others
@@ -832,8 +834,17 @@ top_taxa_RRA <- modified_species_data %>%
   slice_head(n =10) %>%  # Keeping all 13 for now
   pull(TaxonName)
 
-# stacked bar for all samples, no "Other" category as only 12 species
-ggplot(modified_species_data, aes(x = SampleID, y = RelativeAbundance, fill = TaxonName)) +
+# Create color palette
+n_colors_needed <- length(top_taxa_RRA)
+distinct_colors <- RColorBrewer::brewer.pal(max(3, min(n_colors_needed, 12)), "Set3")[1:n_colors_needed]
+all_colors <- c(distinct_colors, "grey70")
+names(all_colors) <- c(top_taxa_RRA, "Other")
+
+# stacked bar for all samples
+modified_species_data %>% 
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = SampleID, y = RelativeAbundance, fill = colour)) +
   geom_bar(stat = "identity", position = "fill") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
@@ -841,28 +852,24 @@ ggplot(modified_species_data, aes(x = SampleID, y = RelativeAbundance, fill = Ta
        y = "Relative Abundance (%)",
        fill = "Taxon") +
   scale_y_continuous(labels = scales::percent) +
-  scale_fill_brewer(palette = "Set3")
+  scale_fill_manual(values = all_colors)
 ```
-
-    ## Warning in RColorBrewer::brewer.pal(n, pal): n too large, allowed maximum for palette Set3 is 12
-    ## Returning the palette you asked for with that many colors
 
 ![](MiFish_commands_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
-#ggsave("MiFish_2024/relative_abundance_per_sample.pdf", width = 12, height = 8)
+#ggsave("MiFish/relative_abundance_per_sample.pdf", width = 12, height = 8)
 ```
-
-Modify to plot the mean RRA for each year.
 
 ## 14. RRA summary
 
-Need to figure out how to display by year properly.
+Make a table.
 
 ``` r
+# Tabulate mean RRA for each species
 modified_species_data %>% group_by(TaxonName, Year) %>% 
   summarise(RRA_percent = mean(RelativeAbundance)) %>% 
-  arrange(TaxonName, Year, -RRA_percent) %>% 
+  arrange(Year, -RRA_percent, TaxonName, ) %>% 
   mutate(across(where(is.numeric), round, 2)) %>% 
   kable()
 ```
@@ -883,83 +890,159 @@ modified_species_data %>% group_by(TaxonName, Year) %>%
     ##   # Now
     ##   across(a:b, \(x) mean(x, na.rm = TRUE))
 
-| TaxonName                        | Year | RRA_percent |
-|:---------------------------------|:-----|------------:|
-| Ammodytes (genus level)          | 2020 |        0.00 |
-| Ammodytes (genus level)          | 2021 |        0.00 |
-| Ammodytes (genus level)          | 2022 |        0.03 |
-| Ammodytes (genus level)          | 2023 |        0.00 |
-| Ammodytes (genus level)          | 2024 |        0.00 |
-| Ammodytes (genus level)          | 2025 |        0.14 |
-| Anarhichas (genus level)         | 2020 |        0.00 |
-| Anarhichas (genus level)         | 2021 |        0.00 |
-| Anarhichas (genus level)         | 2022 |        0.00 |
-| Anarhichas (genus level)         | 2023 |        0.00 |
-| Anarhichas (genus level)         | 2024 |        0.00 |
-| Anarhichas (genus level)         | 2025 |        0.07 |
-| Cryptacanthodidae (family level) | 2020 |        0.00 |
-| Cryptacanthodidae (family level) | 2021 |        0.00 |
-| Cryptacanthodidae (family level) | 2022 |        0.00 |
-| Cryptacanthodidae (family level) | 2023 |        0.00 |
-| Cryptacanthodidae (family level) | 2024 |        0.00 |
-| Cryptacanthodidae (family level) | 2025 |        0.11 |
-| Gadus morhua                     | 2020 |        0.00 |
-| Gadus morhua                     | 2021 |        0.00 |
-| Gadus morhua                     | 2022 |        2.08 |
-| Gadus morhua                     | 2023 |        0.06 |
-| Gadus morhua                     | 2024 |        0.00 |
-| Gadus morhua                     | 2025 |        2.77 |
-| Liparis (genus level)            | 2020 |        0.00 |
-| Liparis (genus level)            | 2021 |        0.00 |
-| Liparis (genus level)            | 2022 |        0.10 |
-| Liparis (genus level)            | 2023 |        0.00 |
-| Liparis (genus level)            | 2024 |        0.00 |
-| Liparis (genus level)            | 2025 |        0.06 |
-| Merluccius bilinearis            | 2020 |        0.30 |
-| Merluccius bilinearis            | 2021 |        0.00 |
-| Merluccius bilinearis            | 2022 |        0.20 |
-| Merluccius bilinearis            | 2023 |        0.00 |
-| Merluccius bilinearis            | 2024 |        0.00 |
-| Merluccius bilinearis            | 2025 |        0.00 |
-| Myoxocephalus (genus level)      | 2020 |       11.53 |
-| Myoxocephalus (genus level)      | 2021 |        0.00 |
-| Myoxocephalus (genus level)      | 2022 |       19.16 |
-| Myoxocephalus (genus level)      | 2023 |       36.78 |
-| Myoxocephalus (genus level)      | 2024 |       30.77 |
-| Myoxocephalus (genus level)      | 2025 |       32.80 |
-| Pholis gunnellus                 | 2020 |       74.78 |
-| Pholis gunnellus                 | 2021 |       75.07 |
-| Pholis gunnellus                 | 2022 |       62.55 |
-| Pholis gunnellus                 | 2023 |       50.38 |
-| Pholis gunnellus                 | 2024 |       31.03 |
-| Pholis gunnellus                 | 2025 |       38.19 |
-| Pollachius virens                | 2020 |        0.00 |
-| Pollachius virens                | 2021 |        0.00 |
-| Pollachius virens                | 2022 |        0.00 |
-| Pollachius virens                | 2023 |        3.28 |
-| Pollachius virens                | 2024 |        0.00 |
-| Pollachius virens                | 2025 |        0.00 |
-| Sebastes (genus level)           | 2020 |        1.70 |
-| Sebastes (genus level)           | 2021 |        0.00 |
-| Sebastes (genus level)           | 2022 |        0.00 |
-| Sebastes (genus level)           | 2023 |        0.00 |
-| Sebastes (genus level)           | 2024 |        0.00 |
-| Sebastes (genus level)           | 2025 |        0.00 |
-| Tautogolabrus adspersus          | 2020 |       11.69 |
-| Tautogolabrus adspersus          | 2021 |       17.04 |
-| Tautogolabrus adspersus          | 2022 |       12.55 |
-| Tautogolabrus adspersus          | 2023 |        3.09 |
-| Tautogolabrus adspersus          | 2024 |       21.04 |
-| Tautogolabrus adspersus          | 2025 |        5.61 |
-| Ulvaria subbifurcata             | 2020 |        0.00 |
-| Ulvaria subbifurcata             | 2021 |        7.89 |
-| Ulvaria subbifurcata             | 2022 |        3.33 |
-| Ulvaria subbifurcata             | 2023 |        6.40 |
-| Ulvaria subbifurcata             | 2024 |       17.16 |
-| Ulvaria subbifurcata             | 2025 |       19.52 |
-| Urophycis chuss                  | 2020 |        0.00 |
-| Urophycis chuss                  | 2021 |        0.00 |
-| Urophycis chuss                  | 2022 |        0.00 |
-| Urophycis chuss                  | 2023 |        0.00 |
-| Urophycis chuss                  | 2024 |        0.00 |
-| Urophycis chuss                  | 2025 |        0.73 |
+| TaxonName                   | Year | RRA_percent |
+|:----------------------------|:-----|------------:|
+| Pholis gunnellus            | 2020 |       74.78 |
+| Tautogolabrus adspersus     | 2020 |       11.69 |
+| Myoxocephalus (genus level) | 2020 |       11.53 |
+| Sebastes (genus level)      | 2020 |        1.70 |
+| Merluccius bilinearis       | 2020 |        0.30 |
+| Ammodytes (genus level)     | 2020 |        0.00 |
+| Anarhichas (genus level)    | 2020 |        0.00 |
+| Cryptacanthodes maculatus   | 2020 |        0.00 |
+| Gadus morhua                | 2020 |        0.00 |
+| Liparis (genus level)       | 2020 |        0.00 |
+| Pollachius virens           | 2020 |        0.00 |
+| Ulvaria subbifurcata        | 2020 |        0.00 |
+| Urophycis chuss             | 2020 |        0.00 |
+| Pholis gunnellus            | 2021 |       75.07 |
+| Tautogolabrus adspersus     | 2021 |       17.05 |
+| Ulvaria subbifurcata        | 2021 |        7.89 |
+| Ammodytes (genus level)     | 2021 |        0.00 |
+| Anarhichas (genus level)    | 2021 |        0.00 |
+| Cryptacanthodes maculatus   | 2021 |        0.00 |
+| Gadus morhua                | 2021 |        0.00 |
+| Liparis (genus level)       | 2021 |        0.00 |
+| Merluccius bilinearis       | 2021 |        0.00 |
+| Myoxocephalus (genus level) | 2021 |        0.00 |
+| Pollachius virens           | 2021 |        0.00 |
+| Sebastes (genus level)      | 2021 |        0.00 |
+| Urophycis chuss             | 2021 |        0.00 |
+| Pholis gunnellus            | 2022 |       56.94 |
+| Myoxocephalus (genus level) | 2022 |       19.82 |
+| Tautogolabrus adspersus     | 2022 |       15.42 |
+| Ulvaria subbifurcata        | 2022 |        4.54 |
+| Gadus morhua                | 2022 |        2.84 |
+| Merluccius bilinearis       | 2022 |        0.27 |
+| Liparis (genus level)       | 2022 |        0.14 |
+| Ammodytes (genus level)     | 2022 |        0.04 |
+| Anarhichas (genus level)    | 2022 |        0.00 |
+| Cryptacanthodes maculatus   | 2022 |        0.00 |
+| Pollachius virens           | 2022 |        0.00 |
+| Sebastes (genus level)      | 2022 |        0.00 |
+| Urophycis chuss             | 2022 |        0.00 |
+| Pholis gunnellus            | 2023 |       50.38 |
+| Myoxocephalus (genus level) | 2023 |       36.78 |
+| Ulvaria subbifurcata        | 2023 |        6.40 |
+| Pollachius virens           | 2023 |        3.28 |
+| Tautogolabrus adspersus     | 2023 |        3.09 |
+| Gadus morhua                | 2023 |        0.06 |
+| Ammodytes (genus level)     | 2023 |        0.00 |
+| Anarhichas (genus level)    | 2023 |        0.00 |
+| Cryptacanthodes maculatus   | 2023 |        0.00 |
+| Liparis (genus level)       | 2023 |        0.00 |
+| Merluccius bilinearis       | 2023 |        0.00 |
+| Sebastes (genus level)      | 2023 |        0.00 |
+| Urophycis chuss             | 2023 |        0.00 |
+| Pholis gunnellus            | 2024 |       31.03 |
+| Myoxocephalus (genus level) | 2024 |       30.77 |
+| Tautogolabrus adspersus     | 2024 |       21.04 |
+| Ulvaria subbifurcata        | 2024 |       17.16 |
+| Ammodytes (genus level)     | 2024 |        0.00 |
+| Anarhichas (genus level)    | 2024 |        0.00 |
+| Cryptacanthodes maculatus   | 2024 |        0.00 |
+| Gadus morhua                | 2024 |        0.00 |
+| Liparis (genus level)       | 2024 |        0.00 |
+| Merluccius bilinearis       | 2024 |        0.00 |
+| Pollachius virens           | 2024 |        0.00 |
+| Sebastes (genus level)      | 2024 |        0.00 |
+| Urophycis chuss             | 2024 |        0.00 |
+| Pholis gunnellus            | 2025 |       38.19 |
+| Myoxocephalus (genus level) | 2025 |       32.80 |
+| Ulvaria subbifurcata        | 2025 |       19.52 |
+| Tautogolabrus adspersus     | 2025 |        5.61 |
+| Gadus morhua                | 2025 |        2.77 |
+| Urophycis chuss             | 2025 |        0.73 |
+| Ammodytes (genus level)     | 2025 |        0.14 |
+| Cryptacanthodes maculatus   | 2025 |        0.11 |
+| Anarhichas (genus level)    | 2025 |        0.07 |
+| Liparis (genus level)       | 2025 |        0.06 |
+| Merluccius bilinearis       | 2025 |        0.00 |
+| Pollachius virens           | 2025 |        0.00 |
+| Sebastes (genus level)      | 2025 |        0.00 |
+
+Make a plot.
+
+``` r
+modified_species_data %>% group_by(TaxonName, Year) %>% 
+  summarise(RRA_percent = mean(RelativeAbundance)) %>% 
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = Year, y = RRA_percent, fill = colour)) +
+  geom_bar(stat = "identity", position = "fill") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Year", 
+       y = "Relative Abundance (%)",
+       fill = "Taxon") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = all_colors)
+```
+
+    ## `summarise()` has grouped output by 'TaxonName'. You can override using the
+    ## `.groups` argument.
+
+![](MiFish_commands_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+``` r
+#ggsave("MiFish/relative_abundance_per_year.pdf", width = 12, height = 8)
+```
+
+Tabulate number of samples per year
+
+``` r
+modified_species_data %>% group_by(Year) %>% 
+  summarise(n = n_distinct(SampleID))
+```
+
+    ## # A tibble: 6 × 2
+    ##   Year      n
+    ##   <fct> <int>
+    ## 1 2020      7
+    ## 2 2021      6
+    ## 3 2022     33
+    ## 4 2023     27
+    ## 5 2024     32
+    ## 6 2025     33
+
+Add sample sizes to plot
+
+``` r
+# Calculate sample sizes
+sample_sizes <- modified_species_data %>% 
+  group_by(Year) %>% 
+  summarise(n_samples = n_distinct(SampleID))
+
+
+modified_species_data %>% group_by(TaxonName, Year) %>% 
+  summarise(RRA_percent = mean(RelativeAbundance)) %>% 
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = Year, y = RRA_percent, fill = colour)) +
+  geom_bar(stat = "identity", position = "fill") +
+  geom_text(data = sample_sizes, 
+            aes(x = Year, y = 1.02, label = paste("n =", n_samples)), 
+            inherit.aes = FALSE, 
+            hjust = 0.5, size = 3) +
+  theme_bw() +
+  labs(x = "Year", 
+       y = "Relative Abundance (%)",
+       fill = "Taxon") +
+  scale_y_continuous(labels = scales::percent) + # 
+  scale_fill_manual(values = all_colors)
+```
+
+    ## `summarise()` has grouped output by 'TaxonName'. You can override using the
+    ## `.groups` argument.
+
+![](MiFish_commands_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->

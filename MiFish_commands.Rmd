@@ -17,12 +17,13 @@ library(knitr)
 library(qiime2R)
 ```
 
-All analyses performed in the folder `Fecal_metabarcoding/Black-Guillemots`.
+All analyses performed in the folder `Fecal_metabarcoding/Black-Guillemots`. We have four plates on which the samples have been sequenced: 24, 64, 81, and 146.
 ```
 conda activate qiime2-amplicon-2024.10 
 mkdir MiFish
 cd MiFish
 ```
+Will have to redo everything once we have redone plate 146 with the MiFish primers.
 
 ## 2. Import the data into QIIME2
 
@@ -34,7 +35,7 @@ for K in 24 64 81 146; do
     --input-format CasavaOneEightSingleLanePerSampleDirFmt\
     --output-path demux_Plate$K.qza
 done
-  
+
 
 for K in 24 64 81 146; do
   qiime demux summarize \
@@ -75,7 +76,7 @@ done
 ```
 It looks like 77% is being kept for the first samples, but the samples on plate 146 are at 100%, suggesting a problem with them.
 
-**Did Alex use MiniFish primers for plate 140??**
+**Trimming for MiniFish primers on Plate 146**
 
 Try trimming for minifish instead
 
@@ -128,7 +129,7 @@ done
 ```
 88% consistently for first set of samples, but then 100% for plate 146 again.
 
-** Redo 146 for MiniFish primers**
+**Redo 146 for MiniFish primers**
 
 ```
 for K in 146; do
@@ -353,13 +354,6 @@ qiime metadata tabulate \
   --o-visualization superblast_taxonomy
 ```
 
-Output sequence taxonomy file with rep-seqs and their assigned taxa.
-```
-qiime metadata tabulate \
-  --m-input-file merged_rep-seqs.qza \
-  --m-input-file superblast_taxonomy.qza \
-  --o-visualization sequence_taxonomy.qzv
-```
 
 Make a barplot to eye-ball what's in our samples:
 ```
@@ -370,9 +364,9 @@ qiime taxa barplot \
   --o-visualization barplot_before_filtering.qzv
 
 ```
-Plate 146 looks very different to the other samples as fish are consistently being assigned to different taxa.
+Plate 146 looks very different to the other samples as fish are consistently being assigned to different taxa because of the use of the wrong primers.
 
-MiniFish primers have missed Atlantic herring in the mock community, but there is no herring in the samples from any of the other years, so this is not a problem. Are they missing other things though?
+MiniFish primers have missed Atlantic herring in the mock community, but there is no herring in the samples from any of the other years, so this is hopefully not a problem. Are they missing other things though?
 
 The MiniFish primers have also not amplified any guillemot DNA compared to the MiFish primers, but the amount amplified by MiFish primers is pretty minimal in most of the samples.
 
@@ -414,7 +408,7 @@ results <- analyze_read_depths(
   save_output = TRUE
 )
 ```
-Good news, the extraction-, field-, and PCR-banks all have barely any reads in them.
+The extraction-, field-, and PCR-banks all have barely any reads in them.
 
 ## 9. Calculate alpha rarefaction curves 
 
@@ -439,10 +433,10 @@ qiime diversity alpha-rarefaction \
   --i-table merged_table_noBirdsMammalsUnassigned_collapsed.qza \
   --m-metadata-file metadata.txt \
   --p-min-depth 50 \
-  --p-max-depth 600 \
-  --o-visualization alpha-rarefaction-50-600
+  --p-max-depth 500 \
+  --o-visualization alpha-rarefaction-50-500
 ```
-Species richness plateaus in the samples at 150 reads, so just drop samples with fewer than 150. This drops the final extraction blank, two of the field blanks, and two samples. Two field blanks remain with 312 and 1,102 reads.
+Species richness plateaus in the samples at 200 reads, so just drop samples with fewer than 200. This drops the final extraction blank, two of the field blanks, and three samples. Two field blanks remain with 312 and 1,102 reads.
 
 ## 10. Filtering
 
@@ -451,16 +445,16 @@ Species richness plateaus in the samples at 150 reads, so just drop samples with
 ```
 qiime feature-table filter-samples \
   --i-table merged_table_noBirdsMammalsUnassigned.qza \
-  --p-min-frequency 150 \
+  --p-min-frequency 200 \
   --m-metadata-file metadata.txt \
   --p-where "Type='SAMPLE'" \
-  --o-filtered-table merged_table_noBirdsMammalsUnassigned_minfreq150
+  --o-filtered-table merged_table_noBirdsMammalsUnassigned_minfreq200
   
 qiime taxa barplot \
-  --i-table merged_table_noBirdsMammalsUnassigned_minfreq150.qza  \
+  --i-table merged_table_noBirdsMammalsUnassigned_minfreq200.qza  \
   --m-metadata-file metadata.txt \
   --i-taxonomy superblast_taxonomy.qza \
-  --o-visualization barplot_noBirdsMammalsUnassigned_minfreq150
+  --o-visualization barplot_noBirdsMammalsUnassigned_minfreq200
 ```
 
 ### 1% Abundance filtering
@@ -470,7 +464,7 @@ Note that I turned this into a script when I was working on Sabiya Sheikh's 2025
 ```{r}
 # Set arguments
 args <- list(
-  feature_table = "MiFish/merged_table_noBirdsMammalsUnassigned_minfreq150.qza",
+  feature_table = "MiFish/merged_table_noBirdsMammalsUnassigned_minfreq200.qza",
   taxonomy = "MiFish/superblast_taxonomy.qza",
   metadata = "MiFish/metadata.txt",
   output_dir = "MiFish/",
@@ -497,22 +491,22 @@ qiime tools import \
   --input-path filtered_feature_table.biom \
   --type 'FeatureTable[Frequency]' \
   --input-format BIOMV100Format \
-  --output-path filtered_table_minfreq150_minabund1.qza
+  --output-path filtered_table_minfreq200_minabund1.qza
 
 # Import taxonomy
 qiime tools import \
   --input-path filtered_taxonomy.tsv \
   --type 'FeatureData[Taxonomy]' \
   --input-format TSVTaxonomyFormat \
-  --output-path filtered_taxonomy_minfreq150_minabund1.qza
+  --output-path filtered_taxonomy_minfreq200_minabund1.qza
 ```
 Make a barplot with the filtered data
 ```
 qiime taxa barplot \
-  --i-table filtered_table_minfreq150_minabund1.qza \
-  --i-taxonomy filtered_taxonomy_minfreq150_minabund1.qza \
+  --i-table filtered_table_minfreq200_minabund1.qza \
+  --i-taxonomy filtered_taxonomy_minfreq200_minabund1.qza \
   --m-metadata-file metadata.txt \
-  --o-visualization barplot_minfreq150_minabund1.qzv
+  --o-visualization barplot_minfreq200_minabund1.qzv
 ```
 
 
@@ -524,18 +518,26 @@ First, filter down the rep-seqs to just those that are found in our remaining sa
 ```
 qiime feature-table filter-seqs \
   --i-data merged_rep-seqs.qza \
-  --i-table filtered_table_minfreq150_minabund1.qza \
-  --o-filtered-data filtered_rep-seqs_minfreq150_minabund1.qza
+  --i-table filtered_table_minfreq200_minabund1.qza \
+  --o-filtered-data filtered_rep-seqs_minfreq200_minabund1.qza
 ```
 
 Next make a table with sequences and taxonomy strings:
 ```
 qiime metadata tabulate \
-  --m-input-file filtered_rep-seqs_minfreq150_minabund1.qza \
-  --m-input-file filtered_taxonomy_minfreq150_minabund1.qza \
-  --o-visualization sequence_taxonomy_minfreq150_minabund1.qzv
+  --m-input-file filtered_rep-seqs_minfreq200_minabund1.qza \
+  --m-input-file filtered_taxonomy_minfreq200_minabund1.qza \
+  --o-visualization sequence_taxonomy_minfreq200_minabund1.qzv
 ```
-**I THINK THIS IS RIGHT BUT CHECK WITH BIGELOW BEFORE FINALISING**
+
+A few notes on the taxonomy edits:   
+* Pacific cod changed to Atlantic cod.   
+* Atlantic wolffish changed to wolffish sp. although the Atlantic wolffish is by far the most common in the GoM out of the three possibilities according to Bigelow and Schroeder.   
+* Three sculpins (Myoxocephalus sp.) are possible in the GoM - all common and genetically alike: longhorn, shorthorn, and grubby.   
+* There is only one wrymouth found in the GoM according to Bigelow and Schroeder.  
+* There are four Liparis spp in the GoM, but none were on genbank.  
+* The redfish (Sebastes) species is most likely acadian redfish (S. fasciatus).   
+
 
 Make edits after reading the taxonomy artifact into R.
 ```{r}
@@ -543,14 +545,14 @@ tax <- read_qza("MiFish/superblast_taxonomy.qza")
 
 tax$data$Taxon <- tax$data$Taxon %>% 
   str_replace_all("g__Gadus;s__chalcogrammus", "g__Gadus;s__morhua") %>%       # Atlantic cod
-  str_replace_all("g__Anarhichas;s__lupus", "g__Anarhichas;s__") %>%       # Wolffish sp.
+  str_replace_all("g__Anarhichas;s__lupus", "g__Anarhichas;s__") %>%       # Wolffish sp. 
   str_replace_all("g__Microcottus;s__sellaris", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
   str_replace_all("g__Myoxocephalus;s__aenaeus", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
-  str_replace_all("g__Myoxocephalus;s__octodecemspinosus", "g__Myoxocephalus;s__") %>%       # Sculpins sp.
-  str_replace_all("g__Cryptacanthodes;s__bergi", "g__;s__") %>%       # Cryptacanthodidae (wrymouths)
-  str_replace_all("g__Liparis;s__miostomus", "g__Liparis;s__") %>%       # 
+  str_replace_all("g__Myoxocephalus;s__octodecemspinosus", "g__Myoxocephalus;s__") %>%       # Sculpins sp. 
+  str_replace_all("g__Cryptacanthodes;s__bergi", "g__Cryptacanthodes;s__maculatus") %>%       # Wrymouth
+  str_replace_all("g__Liparis;s__miostomus", "g__Liparis;s__") %>%       # four possible Liparis species in GoM
   str_replace_all("g__Pholis;s__crassispina", "g__Pholis;s__gunnellus") %>%       # Rock gunnell
-  str_replace_all("g__Sebastes;s__mentella", "g__Sebastes;s__") %>%       # Redfish
+  str_replace_all("g__Sebastes;s__mentella", "g__Sebastes;s__") %>%       # Most likely acadian redfish (S. fasciatus) according to Bigelow & Schoeder
   str_replace_all("g__Opisthocentrus;s__ocellatus", "g__Ulvaria;s__subbifurcata") %>%       # Radiated shanny 
   str_replace_all("g__Ammodytes;s__dubius", "g__Ammodytes;s__")       # Sandlance
 
@@ -586,15 +588,11 @@ qiime metadata tabulate \
   --o-visualization superblast_taxonomy_edited
   
 qiime taxa barplot \
-  --i-table filtered_table_minfreq150_minabund1.qza \
+  --i-table filtered_table_minfreq200_minabund1.qza \
   --i-taxonomy superblast_taxonomy_edited.qza \
   --m-metadata-file metadata.txt \
-  --o-visualization barplot_noBirdsMammalsUnassigned_minfreq150_minabund1_taxedit.qzv
+  --o-visualization barplot_noBirdsMammalsUnassigned_minfreq200_minabund1_taxedit.qzv
 ```
-
-There are some questionable similarities between consecutive samples in the 2022 batch. I think I might need to remove the top half of the samples on the plate as they all look too similar.
-
-This will mean starting again with plate 64 after removing those samples.
 
 
 ## 12. Create RRA table
@@ -604,7 +602,7 @@ I have modified this from the code I had for the UK gannet project. I had to rem
 library(qiime2R)
 
 # Read in the QIIME 2 artifacts and metadata
-feature_table <- read_qza("MiFish/filtered_table_minfreq150_minabund1.qza")
+feature_table <- read_qza("MiFish/filtered_table_minfreq200_minabund1.qza")
 taxonomy_data <- read_qza("MiFish/superblast_taxonomy_edited.qza")
 metadata <- read_q2metadata("MiFish/metadata.txt")
 
@@ -679,7 +677,7 @@ This works and now keeps the sample metadata in the final table.
 
 ## 13. Quick plot
 
-Top "n" taxa not working right now.
+Plotting each sample:
 ```{r}
 # To keep top N taxa and group others
 top_taxa_RRA <- modified_species_data %>%
@@ -689,8 +687,17 @@ top_taxa_RRA <- modified_species_data %>%
   slice_head(n =10) %>%  # Keeping all 13 for now
   pull(TaxonName)
 
-# stacked bar for all samples, no "Other" category as only 12 species
-ggplot(modified_species_data, aes(x = SampleID, y = RelativeAbundance, fill = TaxonName)) +
+# Create color palette
+n_colors_needed <- length(top_taxa_RRA)
+distinct_colors <- RColorBrewer::brewer.pal(max(3, min(n_colors_needed, 12)), "Set3")[1:n_colors_needed]
+all_colors <- c(distinct_colors, "grey70")
+names(all_colors) <- c(top_taxa_RRA, "Other")
+
+# stacked bar for all samples
+modified_species_data %>% 
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = SampleID, y = RelativeAbundance, fill = colour)) +
   geom_bar(stat = "identity", position = "fill") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
@@ -698,21 +705,74 @@ ggplot(modified_species_data, aes(x = SampleID, y = RelativeAbundance, fill = Ta
        y = "Relative Abundance (%)",
        fill = "Taxon") +
   scale_y_continuous(labels = scales::percent) +
-  scale_fill_brewer(palette = "Set3")
+  scale_fill_manual(values = all_colors)
 
-#ggsave("MiFish_2024/relative_abundance_per_sample.pdf", width = 12, height = 8)
+#ggsave("MiFish/relative_abundance_per_sample.pdf", width = 12, height = 8)
 ```
-Modify to plot the mean RRA for each year.
+
 
 
 ## 14. RRA summary
 
-Need to figure out how to display by year properly.
+Make a table.
+```{r}
+# Tabulate mean RRA for each species
+modified_species_data %>% group_by(TaxonName, Year) %>% 
+  summarise(RRA_percent = mean(RelativeAbundance)) %>% 
+  arrange(Year, -RRA_percent, TaxonName, ) %>% 
+  mutate(across(where(is.numeric), round, 2)) %>% 
+  kable()
+```
+
+
+Make a plot.
 ```{r}
 modified_species_data %>% group_by(TaxonName, Year) %>% 
   summarise(RRA_percent = mean(RelativeAbundance)) %>% 
-  arrange(TaxonName, Year, -RRA_percent) %>% 
-  mutate(across(where(is.numeric), round, 2)) %>% 
-  kable()
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = Year, y = RRA_percent, fill = colour)) +
+  geom_bar(stat = "identity", position = "fill") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Year", 
+       y = "Relative Abundance (%)",
+       fill = "Taxon") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = all_colors)
 
+#ggsave("MiFish/relative_abundance_per_year.pdf", width = 12, height = 8)
 ```
+
+Tabulate number of samples per year
+```{r}
+modified_species_data %>% group_by(Year) %>% 
+  summarise(n = n_distinct(SampleID))
+```
+
+Add sample sizes to plot
+```{r}
+# Calculate sample sizes
+sample_sizes <- modified_species_data %>% 
+  group_by(Year) %>% 
+  summarise(n_samples = n_distinct(SampleID))
+
+
+modified_species_data %>% group_by(TaxonName, Year) %>% 
+  summarise(RRA_percent = mean(RelativeAbundance)) %>% 
+  mutate(colour = ifelse(TaxonName %in% top_taxa_RRA, TaxonName, "Other"),
+         colour = factor(colour, levels = c(top_taxa_RRA, "Other"))) %>% 
+  ggplot(aes(x = Year, y = RRA_percent, fill = colour)) +
+  geom_bar(stat = "identity", position = "fill") +
+  geom_text(data = sample_sizes, 
+            aes(x = Year, y = 1.02, label = paste("n =", n_samples)), 
+            inherit.aes = FALSE, 
+            hjust = 0.5, size = 3) +
+  theme_bw() +
+  labs(x = "Year", 
+       y = "Relative Abundance (%)",
+       fill = "Taxon") +
+  scale_y_continuous(labels = scales::percent) + # 
+  scale_fill_manual(values = all_colors)
+```
+
